@@ -4,6 +4,16 @@ Terminal-native math notebook: edit a `.txt` document on the left, read results 
 
 The backend is Python: `textual` for the TUI, `numpy` for values, `sympy` plus an ANTLR grammar for parsed LaTeX. Requires Python 3.10+.
 
+## Screenshots
+
+**Dark mode** — the default appearance, following your terminal's dark theme:
+
+![Dark mode](docs/screenshot-dark.png)
+
+**Light mode** — picked up automatically when your terminal uses a light background:
+
+![Light mode](docs/screenshot-light.png)
+
 ## Install
 
 **Fast install** — downloads the repo, installs into a dedicated virtual environment, and puts an `avocado` launcher on your PATH. The installer adds `~/.local/bin` to your shell startup files (`~/.zshrc`, `~/.bashrc`, `~/.profile`, fish config) when it is missing, so `avocado` works from any directory in new terminals. Re-run it any time to update to the latest `main`.
