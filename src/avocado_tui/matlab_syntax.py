@@ -37,6 +37,7 @@ def normalize_math_expression(expr: str) -> str:
     if not text:
         raise MathSyntaxError("Empty expression")
 
+    text = _insert_implicit_multiplication(text)
     text = _replace_matrix_literals(text)
     text = _replace_word_aliases(text)
     text = _replace_exponents(text)
@@ -48,6 +49,14 @@ def normalize_math_expression(expr: str) -> str:
 
 def _replace_exponents(expr: str) -> str:
     return expr.replace("^", "**")
+
+
+def _insert_implicit_multiplication(expr: str) -> str:
+    # Allow MATLAB/Desmos-style implicit multiplication such as 2(3) or (2)(3).
+    expr = re.sub(r"(?<=\d)\s*\(", "*(", expr)
+    expr = re.sub(r"(?<=\d)\s*\[", "*[", expr)
+    expr = re.sub(r"\)\s*\(", ")*(", expr)
+    return expr
 
 
 def _replace_word_aliases(expr: str) -> str:

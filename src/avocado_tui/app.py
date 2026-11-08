@@ -159,6 +159,21 @@ class ResultsPanel(TextArea):
         line_index = top + event.y
         app._last_clicked_result_line = line_index
 
+    async def _on_mouse_up(self, event: events.MouseUp) -> None:
+        await super()._on_mouse_up(event)
+        app = self.app
+        if not isinstance(app, AvocadoApp):
+            return
+        selection = self.selection
+        if selection is None or selection.is_empty:
+            return
+        start_row = min(selection.start[0], selection.end[0])
+        end_row = max(selection.start[0], selection.end[0])
+        if not (0 <= start_row <= end_row < len(app._last_results_full)):
+            return
+        text = "\n".join(app._last_results_full[start_row : end_row + 1])
+        app.copy_to_clipboard(text)
+
     def on_mouse_scroll_up(self, event: events.MouseScrollUp) -> None:
         app = self.app
         if not isinstance(app, AvocadoApp):
