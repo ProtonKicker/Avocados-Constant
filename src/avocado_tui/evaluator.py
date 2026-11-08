@@ -189,6 +189,15 @@ def _append_chunk_output(outputs: list[str], chunk_len: int, rendered: str) -> N
     outputs.append(rendered)
 
 
+def _evaluate_math_line_with_fallback(line: str, ns: dict[str, Any]):
+    if looks_like_latex_syntax(line):
+        try:
+            return evaluate_math_line(translate_latex_line(line), ns)
+        except (MathSyntaxError, SyntaxError):
+            pass
+    return evaluate_math_line(line, ns)
+
+
 def evaluate_source_linewise(source: str, *, stop_on_error: bool = True) -> EvalOutput:
     ns: dict[str, Any] = {}
     outputs: list[str] = []
@@ -243,12 +252,7 @@ def evaluate_source_linewise(source: str, *, stop_on_error: bool = True) -> Eval
             ):
                 if not _is_python_statement_candidate(line):
                     try:
-                        math_line = (
-                            translate_latex_line(line)
-                            if looks_like_latex_syntax(line)
-                            else line
-                        )
-                        math_result = evaluate_math_line(math_line, ns)
+                        math_result = _evaluate_math_line_with_fallback(line, ns)
                     except (MathSyntaxError, SyntaxError):
                         outputs.append(
                             _evaluate_python_chunk(line, ns, stdout_io, stderr_io)
