@@ -32,11 +32,32 @@ def translate_math_line(line: str) -> TranslatedLine:
     return TranslatedLine("eval", normalize_math_expression(line))
 
 
+def _normalize_parenthesized_groups(expr: str) -> str:
+    out: list[str] = []
+    i = 0
+    n = len(expr)
+    while i < n:
+        if expr[i] != "(":
+            out.append(expr[i])
+            i += 1
+            continue
+        end = _find_matching(expr, i, "(", ")")
+        if end == -1:
+            out.append(expr[i])
+            i += 1
+            continue
+        inner = normalize_math_expression(expr[i + 1 : end])
+        out.append("(" + inner + ")")
+        i = end + 1
+    return "".join(out)
+
+
 def normalize_math_expression(expr: str) -> str:
     text = expr.strip()
     if not text:
         raise MathSyntaxError("Empty expression")
 
+    text = _normalize_parenthesized_groups(text)
     text = _insert_implicit_multiplication(text)
     text = _replace_matrix_literals(text)
     text = _replace_word_aliases(text)
@@ -52,12 +73,76 @@ def _replace_exponents(expr: str) -> str:
 
 
 def _insert_implicit_multiplication(expr: str) -> str:
-    # Allow MATLAB/Desmos-style implicit multiplication such as 2(3) or (2)(3).
+    # Allow MATLAB/Desmos-style implicit multiplication such as 2(3), (2)(3),
+    # 2x, sin(1)cos(2), etc. Python keywords and generated helper names are
+    # excluded so comprehensions and casts are not corrupted.
+    _excluded = {
+        "if", "for", "in", "else", "elif", "while", "and", "or", "not", "is",
+        "lambda", "with", "as", "def", "class", "return", "range", "int",
+        "float", "builtins", "sum",
+    }
+
+    # number followed by ( or [
     expr = re.sub(r"(?<=\d)\s*\(", "*(", expr)
     expr = re.sub(r"(?<=\d)\s*\[", "*[", expr)
-    expr = re.sub(r"\)\s*\(", ")*(", expr)
-    return expr
 
+    # ) followed by ( or [
+    expr = re.sub(r"\)\s*\(", ")*(", expr)
+    expr = re.sub(r"\)\s*\[", ")*[", expr)
+
+    # ) followed by number
+    expr = re.sub(r"\)\s*(?=\d)", ")*", expr)
+
+    # ) followed by identifier (not a keyword/helper)
+    def _mul_after_paren(match: re.Match[str]) -> str:
+        ident = match.group(1)
+        if ident in _excluded:
+            return match.group(0)
+        return ")*" + ident
+
+    expr = re.sub(r"\)\s*([A-Za-z_]\w*)", _mul_after_paren, expr)
+
+    # ] followed by (, [, number, or identifier
+    expr = re.sub(r"\]\s*\(", "]*(", expr)
+    expr = re.sub(r"\]\s*\[", "]*[", expr)
+    expr = re.sub(r"\]\s*(?=\d)", "]*", expr)
+
+    def _mul_after_bracket(match: re.Match[str]) -> str:
+        ident = match.group(1)
+        if ident in _excluded:
+            return match.group(0)
+        return "]*" + ident
+
+    expr = re.sub(r"\]\s*([A-Za-z_]\w*)", _mul_after_bracket, expr)
+
+    # number followed by identifier, except scientific notation and keywords
+    def _mul_after_number(match: re.Match[str]) -> str:
+        # match.group(0) is the identifier; check preceding context via the
+        # full match passed in by re.sub on the combined pattern below.
+        return match.group(0)
+
+    # Handle number->identifier with a combined capture of the identifier.
+    def _replace_number_ident(m: re.Match[str]) -> str:
+        ident = m.group(2)
+        # m.group(0) starts at the digit? We matched digit + optional spaces + ident.
+        # Reconstruct with * if allowed.
+        # Extract leading digit portion: everything up to the identifier.
+        full = m.group(0)
+        # leading part is full without ident (and trailing spaces already consumed)
+        leading = full[: len(full) - len(ident)]
+        if ident in _excluded:
+            return full
+        # scientific notation guard: 2e3, 2e+3, 2E-3, ...
+        if ident in ("e", "E"):
+            tail = m.string[m.end():]
+            if re.match(r"[+-]?\d", tail):
+                return full
+        if re.match(r"[eE][+-]?\d", ident):
+            return full
+        return leading + "*" + ident
+
+    expr = re.sub(r"(\d+)\s*([A-Za-z_]\w*)", _replace_number_ident, expr)
+    return expr
 
 def _replace_word_aliases(expr: str) -> str:
     for source, target in _WORD_ALIASES.items():

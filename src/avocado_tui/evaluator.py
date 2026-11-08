@@ -1,4 +1,5 @@
 from __future__ import annotations
+import re
 
 import ast
 import contextlib
@@ -190,10 +191,11 @@ def _append_chunk_output(outputs: list[str], chunk_len: int, rendered: str) -> N
 
 
 def _evaluate_math_line_with_fallback(line: str, ns: dict[str, Any]):
-    if looks_like_latex_syntax(line):
+    scientific_notation = re.search(r"\d[eE][+-]?\d", line) is not None
+    if looks_like_latex_syntax(line) and not scientific_notation:
         try:
             return evaluate_math_line(translate_latex_line(line), ns)
-        except (MathSyntaxError, SyntaxError):
+        except Exception:
             pass
     return evaluate_math_line(line, ns)
 
