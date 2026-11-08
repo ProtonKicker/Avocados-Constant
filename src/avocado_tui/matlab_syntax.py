@@ -17,7 +17,6 @@ class TranslatedLine:
 
 _ASSIGN_RE = re.compile(r"^\s*([A-Za-z_]\w*)\s*=\s*(.+)$")
 _WORD_ALIASES = {
-    "ln": "log",
     "arcsin": "asin",
     "arccos": "acos",
     "arctan": "atan",
